@@ -1,0 +1,326 @@
+---
+title: "COVID-19 in South Africa"
+author: "S.D.T.Silva - AS2021492"
+output: html_document
+---
+
+```{r, include = FALSE}
+library(tidyverse)
+library(coronavirus)
+library(skimr)
+library(knitr)
+library(rmarkdown)
+```
+
+## **1. Introduction**
+### **1.1.Introduction on country South Africa**
+##### South Africa, also known as Republic of South Africa is the southernmost country in the African continent.It is very famous for the amazing wildlife and nature and also for sports. After being discovered by portuguese explorer Bartolomeu Dias, South Africa was colonised by dutch and then by the british.After two wars (boer wars) against british, South Africa gained independence in may 31, 1910.
+
+##### South Africa has three capitals.Pretoria (executive), Cape Town (legislative) and Bloemfontein (judicial). And the largest city is Johannesburg. Nearly 80% of the population is black South Africans and the remaining portion is white, asian and indian. There are 12 officially recognized languages in South Africa.Among them Zulu and Xhosa are the most spoken languages.
+
+### **1.2.Covid - 19 in South Africa**
+##### Covid-19 which is a respiratory system related disease widely referred as coronavirus caused by SAR-COV-2.The first known case (patient zero) was identified from Whuhan, Hubei province, China in december 2019. At the end of January 2020, the outbreak spread into other countries, showing a global pandemic potential situation. The outbreak was declared as a global pandemic at the end of the march, 2020.
+
+##### The first confirmed case of Covid - 19 in South Africa was reported on 5 march 2020, who was a traveller returning from Italy. After that within  two weeks cases were identified among people with no travel history and clusters of cases were started to report. The SA government implemented various methods to control and contain the outbreak.
+
+## **2. Exploratory data analysis**
+### **2.1 Data set** 
+##### The coronavirus dataset contains daily new and death cases from January 2020 to March 2023 and recovery cases from March 2020 to August 2022 collected by the the Centre for Systems Science and Engineering at Johns Hopkins university.
+
+
+#### **Variables**
+
+| Variable       | Description                                      |
+|:--------------:|:------------------------------------------------:|
+| date           | date of the observation                          |
+| province       | Name of the province (if available)              |
+| country        | Name of the country                              |
+| lat            | Latitude of the country                          |
+| long           | Longitude of the country                         |
+| type           | Type of the case (confirmed, death and recovery) |
+| cases          | Number of cases on particular date               |
+| iso2           | Country code (two letters)                       |
+| iso3           | Country code (three letters)                     |
+| population     | Population of the country or province            |
+| continent_name | Name of the continent                            |
+| continent_code | Continent code                                   |
+
+```{r, include = FALSE}
+
+southafrica <- coronavirus %>%
+  filter(country == "South Africa") %>%
+  as_tibble()
+
+sa <- southafrica %>%
+      select(date, type, cases)
+```
+
+#### **Data for South Africa**
+
+```{r, echo = FALSE}
+
+skim(southafrica)
+```
+```{r, include = FALSE}
+
+#function for fixing the negative values
+
+remedial_negative <- function(x, column_number){
+  a <-column_number
+  n <- nrow(x)
+  for (i in 1:n) {
+    if (x[i, a] < 0) {
+      x[i, a] <- (x[i-1, a] + x[i+1, a]) / 2
+    }else{
+      x[i, a] <- x[i, a]
+    }
+  }
+  x
+}
+
+sa <- remedial_negative(sa, 3)
+
+sa1 <- sa %>%
+        pivot_wider(values_from = cases, names_from = type) %>%
+  mutate(active = 0)
+
+# obtaining active cases
+
+for (i in 1:1143) {
+  if (i == 1) {
+    sa1[i, 5] <- sa1[i, 2] - sa1[i, 3] - sa1[i, 4]
+  } else {
+    sa1[i, 5] <- sa1[i, 2] + sa1[i-1, 5] - sa1[i, 3] - sa1[i, 4]
+  }
+}
+```
+
+### **2.2 Analysis of South Africa**
+#### **Total Confirmed, Death and Recovery cases**
+```{r, echo = FALSE}
+kable(sa %>% 
+  group_by(type) %>%
+  summarise(total = sum(cases)))
+```
+#### **Daily confirmed cases in South Africa**
+
+```{r, echo = FALSE}
+sa1 %>%
+  ggplot(aes(x = date, y = confirmed, colour = I("steelblue3"))) +
+  geom_line() + labs(x = "Date", y = "Number of cases",
+                title = "figure 1: daily confirmed covid-19 cases")
+```
+
+##### According to figure 1, the highest number of daily confirmed cases were reported in late 2021. Also in the beginning of the 2021 and mid 2021 there were a large number of confirmed cases per day .After mid 2022, the number of daily confirmed cases were very small. The spikes in the graph may represent covid waves.
+
+#### **Daily deaths in South Africa**
+```{r, echo = FALSE}
+sa1 %>%
+  ggplot(aes(x = date, y = death, colour = I("red2"))) +
+  geom_line() + labs(x = "Date", y = "Number of cases",
+                     title = "figure 2: daily deaths due to covid-19")
+```
+
+##### Figure 2 shows that in the beginning of the 2021 the highest number of daily deaths were reported. Even Though number of daily confirmed cases was highest in late 2022, the number of daily deaths was considerably small. After mid 2022 number of daily deaths were less than 200.
+
+#### **Daily recoveries in South Africa**
+```{r, echo = FALSE}
+sa1 %>%
+  ggplot(aes(x = date, y = recovery, colour = I("green3"))) +
+  geom_line() + labs(x = "Date", y = "Number of cases", 
+                     title = "figure 3: daily recoveries from covid-19")
+```
+
+##### Maximum number of daily recoveries were reported in early 2021. Also there are some high numbers of daily recoveries in the mid 2021. 
+
+#### **Active cases of south africa**
+
+```{r, echo = FALSE}
+sa1 %>%
+  ggplot(aes(x = date, y = active, colour = I("blue"))) +
+  geom_line() + labs(x = "Date", y = "Number of cases",
+                     title = "figure 4: daily active cases")
+```
+
+### **2.3 Comparison with neighbouring countries **
+
+```{r, include = FALSE}
+nearby <- coronavirus %>%
+          filter(country %in% c("Namibia", "Zimbabwe", "South Africa", "Botswana")) %>%
+          select(date, country, type, cases, population)
+
+nearby <- remedial_negative(nearby, 4)
+
+nearbyconfirmed <- nearby %>%
+                  filter(type == "confirmed") %>%
+                  select(-population)
+
+nearbydeath <- nearby %>%
+                filter(type == "death") %>%
+                select(-population)
+
+nearbyrecovery <- nearby %>%
+                  filter(type == "recovery") %>%
+                  select(-population)
+```
+
+#### **Comparing confirmed cases**
+
+```{r, echo = FALSE}
+nearbyconfirmed %>%
+  ggplot(aes(x = date, y = cases, colour = country)) + 
+  facet_grid(rows = vars(country), scales = "free_y") +
+  geom_line() + labs(x = "Date", y = "Number of cases", title = "figure 5: daily confirmed cases in south africa and neigbouring countries")
+```
+
+##### According to figure 5, the highest number of daily confirmed cases for South Africa and Zimbabwe recorded at the same time which  was late 2021. Compared to other countries, South Africa recorded a large number of daily confirmed cases as early as mid 2020.
+
+#### **Comparing deaths**
+
+```{r, echo = FALSE}
+nearbydeath %>%
+  ggplot(aes(x = date, y = cases, colour = country)) + 
+ facet_grid(rows = vars(country), scales = "free_y") +
+  geom_line() + labs(x = "Date", y = "Number of Cases", title = "figure 6: daily deaths in South Africa and neigbouring countries") 
+```
+
+##### Figure 6 shows that the highest number of daily deaths for Zimbabwe, Namibia and Botswana were recorded in mid 2021, while South Africa recorded highest daily deaths in early 2021. In mid 2021 South Africa recorded considerably higher daily deaths, but they were not higher than the daily deaths in early 2021.
+
+#### **Comparing recoveries**
+
+```{r, echo = FALSE}
+nearbyrecovery %>%
+  ggplot(aes(x = date, y = cases, colour = country)) + 
+  facet_grid(rows = vars(country), scales = "free_y") +
+  geom_line() + labs(x = "Date", y = "Number of cases", title = "figure 7: daily recoveries in South Africa and neigbouring countries")
+```
+
+##### Considering figure 7, it shows that the highest number of daily recovery cases for South Africa were recorded in early 2021, while other three countries recorded highest daily recoveries in mid 2021.
+
+```{r, include = FALSE}
+nearby1 <- nearby %>%
+  group_by(country, type) %>%
+  summarise(total = sum(cases))
+
+nearbypop <- nearby %>%
+  select(country, population) %>%
+  group_by(country) %>%
+  summarise(population = mean(population))
+
+nearby1 <-  nearby1 %>%
+  pivot_wider(names_from = type, values_from = total)
+
+nearbydata <- left_join(nearby1, nearbypop) 
+
+nearbydata1 <- nearbydata %>%
+               mutate(confirmed_percentage = (confirmed / population) * 100,
+                     fatality_percentage = (death / confirmed) * 100) %>%
+               select(-c(confirmed, death, recovery))
+
+nearbydata2 <- nearbydata1 %>%
+                pivot_longer(cols = c(confirmed_percentage, fatality_percentage),
+                            names_to = "type", values_to = "percentage")
+```
+
+#### **Comparing confirmed cases percentages and fatality percentages**
+
+```{r, echo = FALSE}
+kable(nearbydata1)
+
+nearbydata2 %>%
+  ggplot(aes(x = country, y = percentage, fill = type)) +
+  geom_col(position = "dodge") + 
+  facet_grid(rows = vars(type), scales = "free_y") +
+  scale_fill_manual(values = c("blue", "red")) +
+  labs(x = "Country", y = "Percentage", title = "figure 8: confirmed percentage and fatality percentage of South Africa and neighbouring countries")
+  
+```
+
+##### According to figure 8, Botswana had largest confirm case percentage where 14.1 % of its population was infected. In South Africa and Namibia approximately equal proportions (6.8 %) of their populations were infected with the virus. Even Though Botswana had a higher confirmed case percentage, the proportion of deaths out of those infected cases were less than other three countries. Furthermore Namibia and South Africa had approximately equal fatality percentages.
+
+### **2.4 Comparing with countries which has simillar population to South Africa**
+
+```{r, include = FALSE}
+coronavirus %>%
+  filter(population >53000000) %>%
+  filter(population < 60000000) %>%
+  select(country) %>%
+  unique()
+  
+simillarpop <- coronavirus %>%
+              filter(country %in% c("South Africa", "Burma", "Kenya")) %>%
+              select(date, country, type, cases, population)
+
+simillarpop <- remedial_negative(simillarpop, 4)
+
+popconfirmed <- simillarpop %>%
+                filter(type == "confirmed") %>%
+                select(-population)
+
+popdeath <- simillarpop %>%
+                filter(type == "death") %>%
+                select(-population)
+
+poprecovery <- simillarpop %>%
+                filter(type == "recovery") %>%
+                select(-population)
+```
+
+#### **Comparing confirmed cases** 
+
+```{r, echo = FALSE}
+popconfirmed %>%
+  ggplot(aes(x = date, y = cases, colour = country)) +
+  facet_grid(rows = vars(country), scales = "free_y") + 
+  geom_line() + labs(x = "Date", y = "Number of cases",
+                     title = "figure 9: daily confirmed cases in South Africa, Burma and Kenya")
+
+```
+
+##### Both South Africa and Kenya recorded their highest daily confirmed cases in later 2021. But in Burma the highest daily confirmed cases were recorded in mid 2021.
+
+#### **Comparing deaths**
+
+```{r, echo = FALSE}
+popdeath %>%
+  ggplot(aes(x = date, y = cases, colour = country)) +
+  facet_grid(rows = vars(country), scales = "free_y") + 
+  geom_line() + labs(x = "Date", y = "Number of cases",
+                   title = "figure 10: daily deaths in South Africa, Burma and Kenya")
+```
+
+##### Out of these three countries Kenya had less number of deaths per day. In Burma, a considerable number of deaths per day were recorded only in the second half of 2021, while South Africa recorded more than 500 deaths per day multiple times between mid 2020 to early 2022.
+
+#### **Comparing recoveries**
+
+```{r, echo = FALSE}
+poprecovery %>%
+  ggplot(aes(x = date, y = cases, colour = country)) +
+  facet_grid(rows = vars(country), scales = "free_y") + 
+  geom_line() + labs(x = "Date", y = "Number of cases",
+                   title = "figure 11: daily recoveries in South Africa, Burma and Kenya")
+```
+
+##### According to figure 11, both Kenya and Burma recorded the highest number of daily recoveries in mid 2021, while South Africa recorded the highest number of recoveries in early 2021.
+
+
+## **3. Conclusion**
+
+##### After the first confirmed case reported on 5th march 2020, confirmed cases per day had repeated spike patterns with an approximately interval of six months. The virus was much fatal in early 2021 with more than 700 deaths per day.Recoveries were also high in  early 2021. Totally, 4 million confirmed cases and 100000 deaths reported in South Africa in this time period.
+
+##### When Comparing South Africa with its neighbouring countries, both in South Africa and Namibia the proportion of infected cases from their respective populations were approximately equal.The virus was less deadly in Botswana compared to South Africa, even though the confirmed cases percentage was higher in Botswana than South Africa. 
+
+##### Considering Kenya and Burma as countries which have populations much similar to South Africa, Both Kenya and South Africa showed somewhat similar pattern when recording daily confirmed cases.This may be due to the fact that the both countries located in the same continent.However in Burma the daily confirmed cases were recorded in different pattern compared to South Africa. South Africa recorded the highest number of deaths while Kenya recorded less number of deaths with less than 50 deaths per day as its highest.
+
+## **4. Discussion**
+
+##### These data were collected by health officials and governments of the respective countries based on cases reported by tests done in hospitals and other medical facilities.There may be cases which were not tested or reported.Negative cases were fixed when doing analysis using the values next to them.
+
+
+## **5.References**
+
+##### https://github.com/RamiKrispin/coronavirus
+##### https://www.britannica.com/science/case-fatality-rate
+##### https://en.m.wikipedia.org/wiki/COVID-19
+##### https://en.m.wikipedia.org/wiki/South_Africa
+##### https://en.m.wikipedia.org/wiki/COVID-19_pandemic_in_South_Africa
